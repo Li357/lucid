@@ -1,0 +1,18 @@
+{
+  "name": "lucid",
+  "version": "0.1.0",
+  "description": "D3 SVG animations to video",
+  "main": "index.js",
+  "author": "Andrew Li",
+  "license": "MIT",
+  "module": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Li357/lucid.git"
+  },
+  "dependencies": {
+    "canvas": "^2.2.0",
+    "d3": "^5.7.0",
+    "jsdom": "^13.1.0"
+  }
+}
