@@ -20,15 +20,10 @@ const options = {
 };
 
 class Scene {
-  constructor(sceneCreatorOrCreators) {
+  constructor(sceneCreator) {
     this.options = options;
-
-    if (Array.isArray(sceneCreatorOrCreators)) {
-      // TODO: See stitch
-    } else {
-      this.sceneCreator = sceneCreatorOrCreators;
-    }
-
+    this.sceneCreator = sceneCreator;
+    this.framePrefix = 0;
     this.jobs = [
       this.initializeBrowser,
       this.createSVG,
@@ -48,7 +43,6 @@ class Scene {
     await this.page.setViewport({ width, height });
     await this.page.evaluate((w, h) => {
       /* eslint-disable no-undef */
-      currentTime = 0;
       performance.now = () => currentTime;
 
       d3.select('body')
@@ -61,6 +55,8 @@ class Scene {
   }
 
   record = async () => {
+    /* eslint-disable-next-line no-undef */
+    await this.page.evaluate(() => currentTime = 0);
     await this.page.evaluate(this.sceneCreator);
 
     const setCurrentTime = (frameID, FPS) => {
@@ -70,23 +66,25 @@ class Scene {
 
     const { duration, fps } = this.options;
     /* eslint-disable no-restricted-syntax, no-await-in-loop */
-    for (const frame of range(duration / 1000 * fps)) {
+    const numberOfFrames = duration / 1000 * fps;
+    for (const frame of range(numberOfFrames)) {
       await this.page.evaluate(setCurrentTime, frame, fps);
 
       const svgEl = await this.page.$('svg');
       await svgEl.screenshot({
-        path: resolve(this.options.path, `output/frames/frame-${frame}.png`),
+        path: resolve(this.options.path, `output/frames/frame-${frame + this.framePrefix}.png`),
       });
     }
+    this.framePrefix += numberOfFrames;
+    await this.page.$eval('svg', el => el.innerHTML = '');
     /* eslint-enable no-restricted-syntax, no-await-in-loop */
   }
 
-  output = async (newPath = this.options.path, newFilename = this.options.filename) => {
+  output = async (newFilename = this.options.filename) => {
     this.file(newFilename);
-    this.path(newPath);
 
     const { log } = console;
-    const outputDir = resolve(newPath, 'output');
+    const outputDir = resolve(this.options.path, 'output');
     const frameDir = resolve(outputDir, 'frames');
 
     try {
@@ -104,6 +102,7 @@ class Scene {
       log(chalk`{bgGreen.bold  SUCCESS } Created frames.`);
     } catch (e) {
       log(chalk`{bgRed.bold  ERROR } Creating frames: ${e}`);
+      return;
     }
 
     try {
@@ -128,6 +127,12 @@ class Scene {
         log(chalk`{bgRed.bold  ERROR } Removing frames: ${e}`);
       }
     }
+  }
+
+  clone() {
+    const instance = new Scene(this.sceneCreator);
+    instance.options = this.options;
+    return instance;
   }
 }
 

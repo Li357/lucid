@@ -1,9 +1,6 @@
-# lucid
-D3 SVG animations to MP4. Animations are constructed from scenes, which are functions that are
-executed in a headless browser context where D3 is loaded by default, and an SVG is already created:
+// Demo test, TODO implement Ava
 
-```js
-import scene, { stitch } from 'lucid';
+const { default: scene, stitch } = require('../dist/index.js');
 
 const HelloWorld = () => {
   const svg = d3.select('svg');
@@ -43,12 +40,6 @@ const byeScene = scene(ByeWorld)
   .duration(3000);
 
 stitch(helloScene, byeScene)
-  .frames(true)
   .path(__dirname)
   .output('video.mp4')
   .then(process.exit);
-```
-
-Which yields:
-
-![Demo](./assets/demo.gif)
