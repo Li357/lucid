@@ -2,7 +2,7 @@
   "name": "lucid",
   "version": "0.1.0",
   "description": "D3 SVG animations to video",
-  "main": "index.js",
+  "main": "dist/index.js",
   "author": "Andrew Li",
   "license": "MIT",
   "module": "src/index.js",
@@ -10,9 +10,24 @@
     "type": "git",
     "url": "https://github.com/Li357/lucid.git"
   },
+  "scripts": {
+    "lint": "node_modules/.bin/eslint src",
+    "build": "node_modules/.bin/rollup -c rollup.config.js"
+  },
   "dependencies": {
-    "canvas": "^2.2.0",
+    "chalk": "^2.4.1",
     "d3": "^5.7.0",
-    "jsdom": "^13.1.0"
+    "puppeteer": "^1.11.0",
+    "rimraf": "^2.6.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.2.2",
+    "@babel/plugin-proposal-class-properties": "^7.2.3",
+    "babel-eslint": "^10.0.1",
+    "eslint": "^5.3.0",
+    "eslint-config-airbnb-base": "13.1.0",
+    "eslint-plugin-import": "^2.14.0",
+    "rollup": "^0.68.1",
+    "rollup-plugin-babel": "^4.1.0"
   }
 }
