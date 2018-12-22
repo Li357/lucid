@@ -1,138 +1,115 @@
-import { existsSync, mkdirSync } from 'fs';
-import { resolve } from 'path';
+import { existsSync, mkdirSync, writeFile } from 'fs';
+import { resolve, dirname } from 'path';
 import { promisify } from 'util';
 import rimraf from 'rimraf';
 import { exec } from 'child_process';
-import { launch } from 'puppeteer';
-import { range } from 'd3';
+
 import chalk from 'chalk';
 
-import { withOptionAccessors, resolveSequentially } from './utils/index';
+import {
+  withOptionAccessors,
+  success,
+  error,
+  progress,
+  progressbar,
+  log,
+  clearAndLog,
+  range,
+} from './utils/index';
+import Browser from './Browser';
 
 const options = {
   fps: 60,
   duration: 1000,
   width: 1920,
   height: 1080,
-  path: __dirname,
-  file: 'output.mp4',
+  path: resolve(__dirname, 'output.mp4'),
   frames: false,
+  d3: 'https://cdnjs.cloudflare.com/ajax/libs/d3/5.7.0/d3.min.js',
 };
 
 class Scene {
-  constructor(sceneCreator) {
+  constructor(url) {
     this.options = options;
-    this.sceneCreator = sceneCreator;
-    this.framePrefix = 0;
-    this.jobs = [
-      this.initializeBrowser,
-      this.createSVG,
-      this.record,
-    ];
-  }
 
-  initializeBrowser = async () => {
-    const browser = await launch();
-    this.page = await browser.newPage();
-    await this.page.goto('about:blank');
-    await this.page.addScriptTag({ url: 'https://cdnjs.cloudflare.com/ajax/libs/d3/5.7.0/d3.min.js' });
-  }
-
-  createSVG = async () => {
     const { width, height } = this.options;
-    await this.page.setViewport({ width, height });
-    await this.page.evaluate((w, h) => {
-      /* eslint-disable no-undef */
-      performance.now = () => currentTime;
-
-      d3.select('body')
-        .append('svg')
-        .attr('width', w)
-        .attr('height', h)
-        .attr('viewBox', `0 0 ${w} ${h}`);
-      /* eslint-enable no-undef */
-    }, width, height);
+    this.browser = new Browser(url, width, height);
+    this.screenshots = [];
   }
 
-  record = async () => {
-    /* eslint-disable-next-line no-undef */
-    await this.page.evaluate(() => currentTime = 0);
-    await this.page.evaluate(this.sceneCreator);
-
-    const setCurrentTime = (frameID, FPS) => {
-      /* eslint-disable-next-line no-undef */
-      currentTime = frameID * 1000 / FPS;
-    };
-
+  record = async (frameCallback = () => {}) => {
     const { duration, fps } = this.options;
-    /* eslint-disable no-restricted-syntax, no-await-in-loop */
     const numberOfFrames = duration / 1000 * fps;
-    for (const frame of range(numberOfFrames)) {
-      await this.page.evaluate(setCurrentTime, frame, fps);
-
-      const svgEl = await this.page.$('svg');
-      await svgEl.screenshot({
-        path: resolve(this.options.path, `output/frames/frame-${frame + this.framePrefix}.png`),
-      });
+    /* eslint-disable no-restricted-syntax, no-await-in-loop */
+    for (const frame of range(1, numberOfFrames + 1)) {
+      frameCallback(frame, numberOfFrames);
+      this.browser.setTimer(frame * 1000 / fps);
+      this.screenshots.push(await this.browser.screenshot());
     }
-    this.framePrefix += numberOfFrames;
-    await this.page.$eval('svg', el => el.innerHTML = '');
     /* eslint-enable no-restricted-syntax, no-await-in-loop */
+
+    // Take advantage of parallelization for writing to files
+    const promisifiedWrite = promisify(writeFile);
+    await Promise.all(this.screenshots.map((base64, i) => promisifiedWrite(
+      resolve(dirname(this.options.path), `frames/frame-${i}.png`),
+      base64,
+      'base64',
+    )));
   }
 
-  output = async (newFilename = this.options.filename) => {
-    this.file(newFilename);
+  output = async (outputPath = this.options.path) => {
+    this.path(outputPath);
+    const frameDir = resolve(dirname(outputPath), 'frames');
 
-    const { log } = console;
-    const outputDir = resolve(this.options.path, 'output');
-    const frameDir = resolve(outputDir, 'frames');
-
+    let step;
     try {
       if (!existsSync(frameDir)) {
+        // First create output directory for frames/mp4 if don't exist
+        step = 'Creating frame directory';
+        log(progress(`${step}...`));
         mkdirSync(frameDir, { recursive: true });
-        log(chalk`{bgGreen.bold  SUCCESS } Created output directory.`);
+        clearAndLog(success(`Created frame directory at ${frameDir}.`), '\n');
       }
-    } catch (e) {
-      log(chalk`{bgRed.bold  ERROR } Creating output directory: ${e}`);
-      return;
-    }
 
-    try {
-      await resolveSequentially(this.jobs);
-      log(chalk`{bgGreen.bold  SUCCESS } Created frames.`);
-    } catch (e) {
-      log(chalk`{bgRed.bold  ERROR } Creating frames: ${e}`);
-      return;
-    }
+      // Start browser
+      step = 'Starting headless browser';
+      log(progress(`${step}...`));
+      await this.browser.start();
+      await this.browser.loadD3(this.options.d3);
+      clearAndLog(success('Started headless browser.'), '\n');
 
-    try {
-      const execPromised = promisify(exec);
-      const outputFile = resolve(outputDir, newFilename);
+      // Generate frames
+      step = 'Generating frames';
+      log(progress(`${step}...`));
+      await this.record((frame, numberOfFrames) => {
+        clearAndLog(
+          progress(`Frame ${frame}/${numberOfFrames}:`),
+          progressbar(frame / numberOfFrames),
+        );
+      });
+      clearAndLog(success(chalk`Generated frames to {underline ${frameDir}}`), '\n');
 
-      await execPromised(`rm -f ${outputFile}`); // force to ignore non-existance
-      await execPromised(
-        `ffmpeg -r 60 -f image2 -s 1920x1080 -i ${resolve(frameDir, 'frame-%d.png')} -vcodec libx264 -crf 25 -pix_fmt yuv420p ${outputFile}`,
+      // Create mp4 from frames via ffmpeg
+      step = 'Generating mp4 from frames';
+      log(progress(`${step}...`));
+      const promisifiedExec = promisify(exec);
+      await promisifiedExec(`rm -f ${outputPath}`); // force to ignore non-existance
+      await promisifiedExec(
+        `ffmpeg -r 60 -f image2 -s 1920x1080 -i ${resolve(frameDir, 'frame-%d.png')} `
+        + `-vcodec libx264 -crf 25 -pix_fmt yuv420p ${outputPath}`,
       );
-      log(chalk`{bgGreen.bold  SUCCESS } Saved to {underline ${outputFile}}.`);
-    } catch (e) {
-      log(chalk`{bgRed.bold  ERROR } Creating mp4: ${e}`);
-      return;
-    }
+      clearAndLog(success(chalk`Saved to {underline ${outputPath}}.`), '\n');
 
-    if (!this.options.frames) {
-      try {
+      if (!this.options.frames) {
+        // Remove frames if not needed
+        step = 'Removing frames';
+        log(progress(`${step}...`));
         await promisify(rimraf)(frameDir);
-        log(chalk`{bgGreen.bold  SUCCESS } Removed frames.`);
-      } catch (e) {
-        log(chalk`{bgRed.bold  ERROR } Removing frames: ${e}`);
+        clearAndLog(success('Removed frames.'), '\n');
       }
+    } catch (e) {
+      log('\n', error(`${step}: ${e}`), '\n');
     }
-  }
-
-  clone() {
-    const instance = new Scene(this.sceneCreator);
-    instance.options = this.options;
-    return instance;
   }
 }
 

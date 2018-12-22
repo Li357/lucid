@@ -13,11 +13,10 @@
   "scripts": {
     "lint": "node_modules/.bin/eslint src",
     "build": "node_modules/.bin/rollup -c rollup.config.js",
-    "test": "node tests/test.js"
+    "test": "node_modules/.bin/ava"
   },
   "dependencies": {
     "chalk": "^2.4.1",
-    "d3": "^5.7.0",
     "puppeteer": "^1.11.0",
     "rimraf": "^2.6.2"
   },

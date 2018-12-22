@@ -1,23 +1,9 @@
 import Scene from './Scene';
+import StaticServer from './StaticServer';
 
-export function stitch(...scenes) {
-  if (!scenes.every(sceneArg => sceneArg instanceof Scene)) {
-    throw new Error('Can only stitch scenes!');
-  }
-  
-  const [firstScene, ...otherScenes] = scenes;
-  const newScene = firstScene.clone();
-  newScene.jobs = otherScenes.reduce((acc, { sceneCreator, options }) => [
-    ...acc,
-    () => {
-      newScene.sceneCreator = sceneCreator;
-      newScene.options = options;
-    },
-    newScene.record,
-  ], newScene.jobs);
-  return newScene;
-}
+const server = new StaticServer();
 
-export default function scene(sceneCreator) {
-  return new Scene(sceneCreator);
+export default function scene(htmlFile) {
+  server.serve(htmlFile);
+  return new Scene(server.url);
 }
