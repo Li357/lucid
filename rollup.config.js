@@ -11,8 +11,14 @@ export default {
     babel({ exclude: 'node_modules/**' }),
   ],
   external: [
-    'fs', 'rimraf', 'path', 'readline', 'util', 'child_process',
-    'http', 'puppeteer',
+    'fs',
+    'rimraf',
+    'path',
+    'readline',
+    'util',
+    'child_process',
+    'express',
+    'puppeteer',
     'chalk',
   ],
 };

@@ -1,49 +1,60 @@
 import { launch } from 'puppeteer';
 
 export default class Browser {
-  constructor(url, width, height) {
+  constructor(url, width, height, browserOptions) {
     this.url = url;
     this.width = width;
     this.height = height;
+    this.browserOptions = browserOptions;
   }
 
   start = async () => {
-    const browser = await launch();
+    const browser = await launch(this.browserOptions);
     this.page = await browser.newPage();
     await this.page.goto(this.url);
   }
 
-  loadD3 = async (url) => {
-    await this.page.addScriptTag({ url });
+  registerHelpers = (helpers) => {
+    return Promise.all(helpers.map(helper => helper(this.page)));
+  }
 
+  initializeGlobals = async () => {
     const { width, height } = this;
     await this.page.setViewport({ width, height });
     await this.page.evaluate((w, h) => {
       /* eslint-disable no-undef */
-      TIME = 0; // binding global vars
-      WIDTH = w;
-      HEIGHT = h;
-      performance.now = () => TIME; // mock current time for transitions
+      L_TIME = 0; // binding global vars
+      L_WIDTH = w,
+      L_HEIGHT = h,
+      L_ONSTART = L_ONSTART || (() => {
+        throw new Error('No hook for L_ONSTART to start scene!');
+      });
+      L_STARTED = false;
+      performance.now = () => L_TIME; // mock current time for transitions
 
-      d3.select('body')
-        .append('svg')
+      d3.select('body').append('svg')
+        .attr('id', 'L_SVG')
         .attr('width', w)
         .attr('height', h)
         .attr('viewBox', `0 0 ${w} ${h}`);
-      onLucidStart();
+
+      L_ONSTART(() => {
+        L_STARTED = true;
+      });
       /* eslint-enable no-undef */
     }, width, height);
+    await this.page.waitForFunction(() => L_STARTED);
   }
 
   setTimer = newVal => this.page.evaluate((newTime) => {
     /* eslint-disable-next-line no-undef */
-    TIME = newTime;
+    L_TIME = newTime;
   }, newVal);
 
   goto = url => this.page.goto(url);
 
   screenshot = async () => {
-    const svg = await this.page.$('svg');
+    const svg = await this.page.$('#L_SVG');
     return svg.screenshot({ encoding: 'base64' });
   }
 }

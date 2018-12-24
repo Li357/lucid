@@ -1,27 +1,30 @@
-import { createServer } from 'http';
-import { promisify } from 'util';
-import { readFile } from 'fs';
+import { readdir } from 'fs';
+import path, { basename, extname } from 'path';
+import express from 'express'
 
-import { error, success, log } from './utils/index';
+import { success, log } from './utils/index';
 
 export default class StaticServer {
-  constructor(port = 8080) {
-    createServer(async (req, res) => {
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      try {
-        res.end(await promisify(readFile)(this.file));
-      } catch (e) {
-        log('\n', error('Could not find specified scene!'), '\n');
-        res.end();
-        process.exit();
-      }
-    }).listen(port);
-    log(success(`Started served on ${port}`), '\n');
-
-    this.url = `http://localhost:${port}`;
+  constructor() {
+    this.app = express();
   }
 
-  serve = (file) => {
-    this.file = file;
-  }
+  start = (scenesRoot) => new Promise((resolve, reject) => {
+    this.app.use(express.static(scenesRoot));
+    const listener = this.app.listen(0, () => {
+      const { port } = listener.address();
+      log(success(`Started server on port ${port}`), '\n');
+      this.url = `http://localhost:${port}`;
+
+      readdir(scenesRoot, (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve();
+      });
+    });
+  })
+
+  get = (file) => `${this.url}/${basename(file)}`
 }
