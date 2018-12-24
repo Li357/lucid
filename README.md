@@ -27,7 +27,7 @@ And in `scenes/scene.html`:
   <body>
     <script>
       /**
-       * Globals exposed via puppeteer:
+       * Globals exposed via puppeteer (attached to window):
        * - L_TIME (mocked time for animation control)
        * - L_WIDTH (width of SVG, animation)
        * - L_HEIGHT
@@ -36,7 +36,7 @@ And in `scenes/scene.html`:
        * 
        * - tex(...) (uses mathjax to create a g element of rendered LaTeX)
        */
-      L_ONSTART = async (START_RECORDING) => {
+      window.L_ONSTART = async (START_RECORDING) => {
         // Initial svg code prep
         const svg = d3.select('#L_SVG')
           .style('background-color', 'black');

@@ -12,5 +12,10 @@
     "rules": {
         "no-console": "off"
     },
-    "plugins": ["ava"]
+    "plugins": ["ava"],
+    "globals": {
+        "window": true,
+        "d3": false,
+        "MathJax": false
+    }
 }

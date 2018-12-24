@@ -14,23 +14,20 @@ export default class Browser {
     await this.page.goto(this.url);
   }
 
-  registerHelpers = (helpers) => {
-    return Promise.all(helpers.map(helper => helper(this.page)));
-  }
+  registerHelpers = helpers => Promise.all(helpers.map(helper => helper(this.page)))
 
   initializeGlobals = async () => {
     const { width, height } = this;
     await this.page.setViewport({ width, height });
     await this.page.evaluate((w, h) => {
-      /* eslint-disable no-undef */
-      L_TIME = 0; // binding global vars
-      L_WIDTH = w,
-      L_HEIGHT = h,
-      L_ONSTART = L_ONSTART || (() => {
+      window.L_TIME = 0; // binding global vars
+      window.L_WIDTH = w;
+      window.L_HEIGHT = h;
+      window.L_ONSTART = window.L_ONSTART || (() => {
         throw new Error('No hook for L_ONSTART to start scene!');
       });
-      L_STARTED = false;
-      performance.now = () => L_TIME; // mock current time for transitions
+      window.L_STARTED = false;
+      window.performance.now = () => window.L_TIME; // mock current time for transitions
 
       d3.select('body').append('svg')
         .attr('id', 'L_SVG')
@@ -38,20 +35,18 @@ export default class Browser {
         .attr('height', h)
         .attr('viewBox', `0 0 ${w} ${h}`);
 
-      L_ONSTART(() => {
-        L_STARTED = true;
+      window.L_ONSTART(() => {
+        window.L_STARTED = true;
       });
-      /* eslint-enable no-undef */
     }, width, height);
-    await this.page.waitForFunction(() => L_STARTED);
+    await this.page.waitForFunction(() => window.L_STARTED);
   }
 
   setTimer = newVal => this.page.evaluate((newTime) => {
-    /* eslint-disable-next-line no-undef */
-    L_TIME = newTime;
-  }, newVal);
+    window.L_TIME = newTime;
+  }, newVal)
 
-  goto = url => this.page.goto(url);
+  goto = url => this.page.goto(url)
 
   screenshot = async () => {
     const svg = await this.page.$('#L_SVG');

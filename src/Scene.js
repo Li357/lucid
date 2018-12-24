@@ -34,7 +34,7 @@ class Scene {
 
     // Name of the output mp4 file, defaults to scene HTML file name
     this.name(basename(url, '.html'));
-    // Path represents the directory where mp4 and frames are created, which matches name option by default
+    // Path represents the directory where mp4 and frames are created, matches name by default
     this.path(resolve(scenesRoot, this.name()));
 
     const { width, height } = this.options;
@@ -54,7 +54,7 @@ class Scene {
     /* eslint-disable no-restricted-syntax, no-await-in-loop */
     for (const frame of range(1, numberOfFrames + 1)) {
       frameCallback(frame, numberOfFrames);
-      this.browser.setTimer(frame * 1000 / fps);
+      await this.browser.setTimer(frame * 1000 / fps);
       this.screenshots.push(await this.browser.screenshot());
     }
     /* eslint-enable no-restricted-syntax, no-await-in-loop */
@@ -67,7 +67,7 @@ class Scene {
     )));
   }
 
-  // TODO: Really would be great to decouple 
+  // TODO: Really would be great to decouple
   output = async (outputDir = this.path(), outputName = this.name()) => {
     this.path(outputDir);
     this.name(outputName);
