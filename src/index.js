@@ -8,7 +8,7 @@ function sceneFactoryFrom(scenesRoot, server, {
   d3URL = 'https://d3js.org/d3.v5.min.js',
   mathJaxURL = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js',
   mathJaxOptions = {},
-  browserOptions,
+  browserOptions = {},
 } = {}) {
   return function scene(htmlFile) {
     // Scenes load d3, mathjax by default, and expose a tex helper for LaTeX

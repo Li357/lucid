@@ -2,14 +2,19 @@ import { clearLine, cursorTo } from 'readline';
 import chalk from 'chalk';
 
 export function withOptionAccessors(cls, options) {
-  Object.entries(options).forEach(([key, initialValue]) => {
+  Object.keys(options).forEach((key) => {
     /* eslint-disable-next-line no-param-reassign */
     cls.prototype[key] = function accessor(newValue) {
+      if (typeof this.options === 'undefined') {
+        this.options = options;
+      }
+
       if (typeof newValue !== 'undefined') {
-        this.options[key] = newValue || initialValue;
+        this.options[key] = newValue;
         return this;
       }
-      return this.options[key] || initialValue;
+
+      return this.options[key];
     };
   });
   return cls;

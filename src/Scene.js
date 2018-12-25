@@ -26,19 +26,19 @@ const options = {
   path: '', // Empty string so accessor is registered (actually set in constructor)
   name: '',
   frames: false,
+  record: true,
 };
 
 class Scene {
   constructor(scenesRoot, url, browserOptions) {
-    this.options = options;
-
     // Name of the output mp4 file, defaults to scene HTML file name
     this.name(basename(url, '.html'));
     // Path represents the directory where mp4 and frames are created, matches name by default
     this.path(resolve(scenesRoot, this.name()));
 
     const { width, height } = this.options;
-    this.browser = new Browser(url, width, height, browserOptions);
+    this.browser = new Browser(url, width, height);
+    this.browserOptions = browserOptions;
     this.screenshots = [];
     this.helpers = [];
   }
@@ -48,7 +48,7 @@ class Scene {
     return this;
   }
 
-  record = async (frameCallback = () => {}) => {
+  startRecording = async (frameCallback = () => {}) => {
     const { duration, fps } = this.options;
     const numberOfFrames = duration / 1000 * fps;
     /* eslint-disable no-restricted-syntax, no-await-in-loop */
@@ -88,38 +88,44 @@ class Scene {
       // Start browser
       step = 'Starting headless browser';
       log(progress(`${step}...`));
-      await this.browser.start();
+      await this.browser.start({
+        // If we just want to play the animation without recording, then it shouldn't be headless
+        headless: this.record(),
+        ...this.browserOptions,
+      });
       await this.browser.registerHelpers(this.helpers); // Register scene helpers before scene setup
-      await this.browser.initializeGlobals();
+      await this.browser.initializeGlobals(this.record());
       clearAndLog(success('Started headless browser.'), '\n');
 
-      // Generate frames
-      step = 'Generating frames';
-      log(progress(`${step}...`));
-      await this.record((frame, numberOfFrames) => {
-        clearAndLog(
-          progress(`Frame ${frame}/${numberOfFrames}:`),
-          progressbar(frame / numberOfFrames),
-        );
-      });
-      clearAndLog(success(`Generated frames to ${frameDir}.`), '\n');
-
-      // Create mp4 from frames via ffmpeg
-      step = 'Generating mp4 from frames';
-      log(progress(`${step}...`));
-      await promisifiedExec(`rm -f ${outputPath}`); // force to ignore non-existance
-      await promisifiedExec(
-        `ffmpeg -r 60 -f image2 -s 1920x1080 -i ${resolve(frameDir, 'frame-%d.png')} `
-        + `-vcodec libx264 -crf 25 -pix_fmt yuv420p ${outputPath}`,
-      );
-      clearAndLog(success(`Saved to ${outputPath}.`), '\n');
-
-      if (!this.frames()) {
-        // Remove frames if not needed
-        step = 'Removing frames';
+      if (this.record()) {
+        // Generate frames
+        step = 'Generating frames';
         log(progress(`${step}...`));
-        await promisify(rimraf)(frameDir);
-        clearAndLog(success('Removed frames.'), '\n');
+        await this.startRecording((frame, numberOfFrames) => {
+          clearAndLog(
+            progress(`Frame ${frame}/${numberOfFrames}:`),
+            progressbar(frame / numberOfFrames),
+          );
+        });
+        clearAndLog(success(`Generated frames to ${frameDir}.`), '\n');
+
+        // Create mp4 from frames via ffmpeg
+        step = 'Generating mp4 from frames';
+        log(progress(`${step}...`));
+        await promisifiedExec(`rm -f ${outputPath}`); // force to ignore non-existance
+        await promisifiedExec(
+          `ffmpeg -r 60 -f image2 -s 1920x1080 -i ${resolve(frameDir, 'frame-%d.png')} `
+          + `-vcodec libx264 -crf 25 -pix_fmt yuv420p ${outputPath}`,
+        );
+        clearAndLog(success(`Saved to ${outputPath}.`), '\n');
+
+        if (!this.frames()) {
+          // Remove frames if not needed
+          step = 'Removing frames';
+          log(progress(`${step}...`));
+          await promisify(rimraf)(frameDir);
+          clearAndLog(success('Removed frames.'), '\n');
+        }
       }
     } catch (e) {
       log('\n', error(`${step}: ${e}`), '\n');

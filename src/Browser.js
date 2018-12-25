@@ -1,25 +1,24 @@
 import { launch } from 'puppeteer';
 
 export default class Browser {
-  constructor(url, width, height, browserOptions) {
+  constructor(url, width, height) {
     this.url = url;
     this.width = width;
     this.height = height;
-    this.browserOptions = browserOptions;
   }
 
-  start = async () => {
-    const browser = await launch(this.browserOptions);
+  start = async (browserOptions) => {
+    const browser = await launch(browserOptions);
     this.page = await browser.newPage();
     await this.page.goto(this.url);
   }
 
   registerHelpers = helpers => Promise.all(helpers.map(helper => helper(this.page)))
 
-  initializeGlobals = async () => {
+  initializeGlobals = async (shouldRecord) => {
     const { width, height } = this;
     await this.page.setViewport({ width, height });
-    await this.page.evaluate((w, h) => {
+    await this.page.evaluate((w, h, record) => {
       window.L_TIME = 0; // binding global vars
       window.L_WIDTH = w;
       window.L_HEIGHT = h;
@@ -27,7 +26,10 @@ export default class Browser {
         throw new Error('No hook for L_ONSTART to start scene!');
       });
       window.L_STARTED = false;
-      window.performance.now = () => window.L_TIME; // mock current time for transitions
+      
+      if (record) {
+        window.performance.now = () => window.L_TIME; // mock current time for transitions
+      }
 
       d3.select('body').append('svg')
         .attr('id', 'L_SVG')
@@ -38,7 +40,7 @@ export default class Browser {
       window.L_ONSTART(() => {
         window.L_STARTED = true;
       });
-    }, width, height);
+    }, width, height, shouldRecord);
     await this.page.waitForFunction(() => window.L_STARTED);
   }
 
